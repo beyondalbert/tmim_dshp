@@ -1,0 +1,19 @@
+# Example DeepSeek Harness / Cordis composition enabling TM IM.
+# Save as cordis.yml next to your harness deployment and adjust values.
+- name: '@tmim/dsh-plugin-tmim'
+  config:
+    baseUrl: 'https://tmim.example.com'
+    credential:
+      kind: 'apikey'
+      token: 'tm_xxxxxxxxxxxxxxxx'      # Agent takeover api_key
+    deviceId: 'dsh-harness-1'
+    agent:
+      provider: 'deepseek-official'
+      model: 'deepseek-chat'
+    cwd: './'
+    tools: true
+    enableAgentTakeover: true
+    webhook:
+      enabled: true
+      path: '/tm/callback'              # must be publicly reachable HTTPS
+      secret: 'whsec_3a7f9c2e5b8d1046'  # issued by TM IM when WEBHOOK is enabled
