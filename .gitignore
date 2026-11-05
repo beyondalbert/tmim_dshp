@@ -3,3 +3,15 @@ dist/
 *.log
 .tmp/
 _coverage/
+# scratch / validation artifacts (NOT part of the plugin)
+_harness/
+_harness.tar.gz
+node24.zip
+node-v24.22.2-win-x64/
+_tools/
+_validate/
+_recheck/
+lefthook.yml
+node24_dir.html
+node*.zip
+node-v*-win-*/

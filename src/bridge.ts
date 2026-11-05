@@ -34,7 +34,7 @@ export class TmimBridge {
       if (event.type !== 'assistant/message') return
       const conv = this.convIdFor(session.id)
       if (conv === undefined) return
-      void this.relayAssistant(conv, session.id, event)
+      void this.relayAssistant(conv, event)
     }
     this.subscriptions.push(this.ctx.on('session/event' as any, onEvent as any))
     return () => {
@@ -80,7 +80,6 @@ export class TmimBridge {
 
   private async relayAssistant(
     convId: number,
-    sessionId: SessionId,
     event: { data: { message?: { content?: Array<{ type: string; text?: string }> } } },
   ): Promise<void> {
     const text = textOf(event.data.message)

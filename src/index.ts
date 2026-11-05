@@ -92,7 +92,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
   const client = new TmimClient({
     baseUrl: config.baseUrl,
-    token: config.credential.kind === 'apikey' ? config.credential.token : undefined,
+    ...(config.credential.kind === 'apikey' ? { token: config.credential.token } : {}),
     deviceId: config.deviceId,
   })
 
@@ -108,8 +108,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Optionally drive Agent Takeover configuration.
   if (config.enableAgentTakeover) {
     const setup = await client.configureAgentTakeover({
-      pushMode: config.webhook.enabled ? 1 : 3, // WEBHOOK or PULL
-      endpointUrl: config.webhook.enabled ? config.webhook.path : undefined,
+      ...(config.webhook.enabled
+        ? { pushMode: 1 as const, endpointUrl: config.webhook.path }
+        : { pushMode: 3 as const }), // WEBHOOK or PULL
       capabilities: ['text'],
       modelInfo: config.agent.model,
     })
@@ -152,10 +153,11 @@ function handleWebhookEvent(bridge: TmimBridge, event: WebhookEvent): void {
   const data = event.data as { sender?: { actor_type?: number } } & Record<string, any>
   // Skip messages the agent itself sent (actor_type === 2 is an Agent).
   if (data.sender?.actor_type === 2) return
+  const replyTo = Number(data.reply_to ?? 0) || undefined
   void bridge.ingestMessage({
     convId: Number(data.conv_id),
     senderId: Number(data.sender_id),
     text: data.content?.text,
-    replyToMessageId: Number(data.reply_to ?? 0) || undefined,
+    ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
   })
 }

@@ -12,6 +12,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
+import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { verifyWebhookSignature, type VerificationResult } from './crypto.ts'
 
 export interface WebhookEvent {
@@ -73,7 +74,7 @@ export function mountTmimWebhook(ctx: Context, options: TmimWebhookOptions): () 
       timestamp: tsHeader ?? '',
       rawBody: raw,
       signatureHeader: sigHeader,
-      maxSkewSeconds: options.maxSkewSeconds,
+      ...(options.maxSkewSeconds === undefined ? {} : { maxSkewSeconds: options.maxSkewSeconds }),
     })
 
     if (!result.ok || !tsHeader) {
@@ -115,7 +116,7 @@ export function mountTmimWebhook(ctx: Context, options: TmimWebhookOptions): () 
     kind: 'exact',
     path: options.path,
     handler,
-  })
+  } satisfies WebRoute)
 
   ctx.logger.info(`[tmim-webhook] mounted at ${options.path}`)
   return dispose

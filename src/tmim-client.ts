@@ -89,7 +89,7 @@ export class TmimClient {
       const res = await this.fetchImpl(url, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: controller.signal,
       })
       let envelope: TmimEnvelope<T> | undefined
@@ -204,7 +204,7 @@ export class TmimClient {
       actorId: d.actor_id,
       enabled: d.enabled,
       pushMode: d.push_mode,
-      endpointUrl: d.endpoint_url,
+      ...(d.endpoint_url === undefined ? {} : { endpointUrl: d.endpoint_url }),
       hasApiKey: d.has_api_key,
       hasWebhookSecret: d.has_webhook_secret,
     }

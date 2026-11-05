@@ -6,10 +6,16 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { TmimClient } from './tmim-client.ts'
 
 function newClientMsgId(): string {
   return `c-${crypto.randomUUID().replaceAll('-', '')}`
+}
+
+/** Render a TM IM tool's canonical JSON result as a text card for the agent history. */
+function renderToolResult(_args: unknown, value: unknown): ContentBlock[] {
+  return [{ type: 'text', text: JSON.stringify(value, null, 2) }]
 }
 
 /**
@@ -28,7 +34,7 @@ export function registerTmimTools(ctx: Context, client: () => TmimClient): () =>
         text: { type: 'string', required: true, description: 'Text payload (Markdown allowed).' },
         replyTo: { type: 'number', description: 'Optional message_id to quote/reply to.' },
       },
-      output: { schema: { type: 'json' } as const },
+      output: { schema: { type: 'json' } as const, render: renderToolResult },
       execute: async (args) => {
         const result = await client().sendText(args.convId, args.text, newClientMsgId(), args.replyTo)
         return { sent: true, messageId: result.messageId, seq: result.seq }
@@ -42,7 +48,7 @@ export function registerTmimTools(ctx: Context, client: () => TmimClient): () =>
       parameters: {
         peer: { type: 'string', required: true, description: 'Peer handle, e.g. "@alice".' },
       },
-      output: { schema: { type: 'json' } as const },
+      output: { schema: { type: 'json' } as const, render: renderToolResult },
       execute: async (args) => {
         const result = await client().getOrCreateDirectConversation(args.peer)
         return {
@@ -66,7 +72,7 @@ export function registerTmimTools(ctx: Context, client: () => TmimClient): () =>
           description: 'Member handles (excluding yourself), e.g. ["@alice","@bob"].',
         },
       },
-      output: { schema: { type: 'json' } as const },
+      output: { schema: { type: 'json' } as const, render: renderToolResult },
       execute: async (args) => {
         const result = await client().createGroupConversation(args.title, args.members)
         return { convId: result.convId }
@@ -79,7 +85,7 @@ export function registerTmimTools(ctx: Context, client: () => TmimClient): () =>
       parameters: {
         limit: { type: 'number', description: 'Max items (default 50).' },
       },
-      output: { schema: { type: 'json' } as const },
+      output: { schema: { type: 'json' } as const, render: renderToolResult },
       execute: async (args) => {
         const result = await client().listConversations(args.limit ?? 50)
         return { items: result.items, nextCursor: result.nextCursor }
@@ -94,7 +100,7 @@ export function registerTmimTools(ctx: Context, client: () => TmimClient): () =>
         sinceSeq: { type: 'number', required: true, description: 'Only messages with seq > this are returned.' },
         limit: { type: 'number', description: 'Max items (default 200).' },
       },
-      output: { schema: { type: 'json' } as const },
+      output: { schema: { type: 'json' } as const, render: renderToolResult },
       execute: async (args) => {
         const items = await client().pullMessagesSince(args.convId, args.sinceSeq, args.limit ?? 200)
         return { items }

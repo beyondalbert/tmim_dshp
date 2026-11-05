@@ -100,11 +100,17 @@ Registered when `tools: true`:
 
 ## Webhook verification (self test)
 
-The signature logic is verified against TM IM's documented test vector:
+The signature logic is verified against TM IM's documented test vector (6 cases: HMAC self-test vector, valid verification, mismatched digest, stale/replayed timestamp, malformed header, raw-body sensitivity). Inside the harness workspace:
 
 ```sh
-npm run test:signature
+cd _harness/deepseek-harness-master/packages/tmim/dsh-plugin-tmim
+pnpm test
 ```
+
+> The package ships its own `vitest.config.ts` because the monorepo root config
+> drives a workspace project topology that only discovers tests under
+> `packages/*/*/tests/**`; running from the plugin directory keeps the signature
+> test self-contained on `node:crypto` + `src/*` (no repo path aliases).
 
 ## Security notes
 
