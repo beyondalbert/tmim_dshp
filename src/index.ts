@@ -91,6 +91,8 @@ export const Config = (z.object({
 
 export const name = 'tmim'
 
+apply.inject = ['tools', 'agents']
+
 export async function apply(ctx: Context, config: Config): Promise<void> {
   if (config.webhook.enabled && !config.webhook.secret) {
     throw new Error('[tmim] webhook.enabled requires webhook.secret (the TM IM webhook_secret)')
