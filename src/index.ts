@@ -145,30 +145,35 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     }
   }
 
-  const bridge = new TmimBridge(ctx, {
-    getClient: () => client,
-    agentOptions: { provider: config.agent.provider, model: config.agent.model },
-    cwd: config.cwd,
+  // tools/agents are Cordis services: ask for them explicitly via ctx.inject.
+  // This works regardless of how the host loader plumbs plugin metadata, and
+  // the scoped context keeps them resolveable even from async event handlers.
+  await ctx.inject(['tools', 'agents'], (scoped) => {
+    const bridge = new TmimBridge(scoped, {
+      getClient: () => client,
+      agentOptions: { provider: config.agent.provider, model: config.agent.model },
+      cwd: config.cwd,
+    })
+
+    // Register all resources in one effect so disposal unwinds them in order.
+    return scoped.effect(function* () {
+      if (config.webhook.enabled) {
+        yield mountTmimWebhook(scoped, {
+          path: config.webhook.path,
+          secret: config.webhook.secret,
+          maxSkewSeconds: config.webhook.maxSkewSeconds,
+          handle: (event: WebhookEvent) => handleWebhookEvent(bridge, event),
+        })
+      }
+
+      if (config.tools) {
+        yield registerTmimTools(scoped, () => client)
+      }
+
+      yield bridge.start()
+      ctx.logger.info('[tmim] started (webhook=%s, tools=%s)', config.webhook.enabled, config.tools)
+    }, 'tmim')
   })
-
-  // Register all resources in one effect so disposal unwinds them in order.
-  ctx.effect(function* () {
-    if (config.webhook.enabled) {
-      yield mountTmimWebhook(ctx, {
-        path: config.webhook.path,
-        secret: config.webhook.secret,
-        maxSkewSeconds: config.webhook.maxSkewSeconds,
-        handle: (event: WebhookEvent) => handleWebhookEvent(bridge, event),
-      })
-    }
-
-    if (config.tools) {
-      yield registerTmimTools(ctx, () => client)
-    }
-
-    yield bridge.start()
-    ctx.logger.info('[tmim] started (webhook=%s, tools=%s)', config.webhook.enabled, config.tools)
-  }, 'tmim')
 }
 
 function handleWebhookEvent(bridge: TmimBridge, event: WebhookEvent): void {
