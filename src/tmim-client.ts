@@ -54,11 +54,14 @@ export class TmimClient {
   private token: string | undefined
   private fetchImpl: typeof fetch
   private timeoutMs: number
+  private readonly baseUrl: string
 
   constructor(private readonly config: TmimConfig) {
     this.token = config.token
     this.fetchImpl = config.fetch ?? globalThis.fetch.bind(globalThis)
     this.timeoutMs = config.timeoutMs ?? 15_000
+    // Normalize so a trailing slash on baseUrl never produces a `//v1/...` path.
+    this.baseUrl = config.baseUrl.replace(/\/+$/, '')
   }
 
   /** Current bearer token (may be a JWT or an Agent api_key). */
@@ -74,7 +77,7 @@ export class TmimClient {
     body?: unknown,
     opts: { auth?: boolean; headers?: Record<string, string> } = {},
   ): Promise<T> {
-    const url = `${this.config.baseUrl}/v1${path}`
+    const url = `${this.baseUrl}/v1${path}`
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...(opts.headers ?? {}),
