@@ -176,7 +176,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
           path: config.webhook.path,
           secret: config.webhook.secret,
           maxSkewSeconds: config.webhook.maxSkewSeconds,
-          handle: (event: WebhookEvent) => handleWebhookEvent(bridge, event),
+          handle: (event: WebhookEvent) => handleWebhookEvent(scoped, bridge, event),
         })
       }
 
@@ -199,18 +199,20 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   })
 }
 
-function handleWebhookEvent(bridge: TmimBridge, event: WebhookEvent): void {
+function handleWebhookEvent(ctx: Context, bridge: TmimBridge, event: WebhookEvent): void {
   if (event.event !== 'message.created' && event.event !== 'mention.created') return
   const data = event.data as { sender?: { actor_type?: number } } & Record<string, any>
   // Skip messages the agent itself sent (actor_type === 2 is an Agent).
   if (data.sender?.actor_type === 2) return
   const replyTo = Number(data.reply_to ?? 0) || undefined
-  void bridge.ingestMessage({
-    convId: Number(data.conv_id),
-    senderId: Number(data.sender_id),
-    text: data.content?.text,
-    ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
-  })
+  bridge
+    .ingestMessage({
+      convId: Number(data.conv_id),
+      senderId: Number(data.sender_id),
+      text: data.content?.text,
+      ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
+    })
+    .catch((error) => ctx.logger.error(`[tmim] webhook ingest failed: ${String(error)}`))
 }
 
 /** Build the WebSocket URL from the config, defaulting to the baseUrl host. */
@@ -270,10 +272,12 @@ function handleWsMessage(ctx: Context, bridge: TmimBridge, msg: InboundMessage):
   }
   const replyTo = Number(msg.replyTo) || undefined
   ctx.logger.info(`[tmim] WS push -> ingest conv=${msg.convId} sender=${msg.senderId} text=${JSON.stringify(text.slice(0, 80))}`)
-  void bridge.ingestMessage({
-    convId: msg.convId,
-    senderId: msg.senderId,
-    text,
-    ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
-  })
+  bridge
+    .ingestMessage({
+      convId: msg.convId,
+      senderId: msg.senderId,
+      text,
+      ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
+    })
+    .catch((error) => ctx.logger.error(`[tmim] ws ingest failed: ${String(error)}`))
 }

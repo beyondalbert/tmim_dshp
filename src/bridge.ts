@@ -51,26 +51,58 @@ export class TmimBridge {
   }): Promise<{ sessionId: string }> {
     const convId = args.convId
     const sessionIdStr = this.sessionIdFor(convId)
+    const sessionId = sessionIdStr as SessionId
     this.ctx.logger.info(`[tmim] ingestMessage conv=${convId} session=${sessionIdStr}`)
-    let agent = this.ctx.agents.get(sessionIdStr as SessionId)
-    if (!agent) {
-      this.ctx.logger.info(`[tmim] creating agent for session=${sessionIdStr}`)
-      const handle = await this.ctx.agents.create({
-        sessionId: sessionIdStr as SessionId,
-        meta: { cwd: this.options.cwd ?? process.cwd() },
-        agentOptions: this.options.agentOptions,
-      })
-      agent = handle.agent
-      this.ctx.logger.info(`[tmim] agent created for session=${sessionIdStr}`)
-    }
+    const agent = await this.ensureAgent(convId, sessionIdStr, sessionId)
+    if (!agent) return { sessionId: sessionIdStr }
     const message = buildUserMessage(args.text ?? '')
     try {
       agent.followup(message)
       this.ctx.logger.info(`[tmim] followup queued for session=${sessionIdStr}`)
     } catch (error) {
       this.ctx.logger.error(`[tmim] followup threw for session=${sessionIdStr}: ${String(error)}`)
+      // Never let a malformed turn take the host down.
     }
     return { sessionId: sessionIdStr }
+  }
+
+  /** Get a live agent for a conversation, creating or resuming it as needed. */
+  private async ensureAgent(
+    convId: number,
+    sessionIdStr: string,
+    sessionId: SessionId,
+  ): Promise<{ followup: (m: UserMessage) => void } | null> {
+    const existing = this.ctx.agents.get(sessionId)
+    if (existing) return existing
+    // Try to create a fresh agent; the session may already be persisted from a
+    // previous run (SessionAlreadyExists), in which case resume it instead.
+    try {
+      const handle = await this.ctx.agents.create({
+        sessionId,
+        meta: { cwd: this.options.cwd ?? process.cwd() },
+        agentOptions: this.options.agentOptions,
+      })
+      this.ctx.logger.info(`[tmim] agent created for session=${sessionIdStr}`)
+      return handle.agent
+    } catch (error) {
+      const msg = String(error)
+      if (/already exists/i.test(msg) || error instanceof Error && error.name === 'SessionAlreadyExistsError') {
+        this.ctx.logger.info(`[tmim] session exists, resuming session=${sessionIdStr}`)
+        try {
+          const handle = await this.ctx.agents.resume({
+            resumeSessionId: sessionId,
+            agentOptions: this.options.agentOptions,
+          })
+          this.ctx.logger.info(`[tmim] agent resumed for session=${sessionIdStr}`)
+          return handle.agent
+        } catch (resumeError) {
+          this.ctx.logger.error(`[tmim] resume failed for session=${sessionIdStr}: ${String(resumeError)}`)
+          return null
+        }
+      }
+      this.ctx.logger.error(`[tmim] agent create failed conv=${convId}: ${msg}`)
+      return null
+    }
   }
 
   // ---- internals ----
