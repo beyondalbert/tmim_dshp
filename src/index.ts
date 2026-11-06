@@ -28,6 +28,7 @@ import { mountTmimWebhook, type WebhookEvent } from './webhook.ts'
 import { TmimBridge } from './bridge.ts'
 import { registerTmimTools } from './tools.ts'
 import { TmimWsClient, type InboundMessage } from './ws-client.ts'
+import { trace } from './trace.ts'
 
 // ---- Config ----
 
@@ -250,10 +251,12 @@ function startWsReceiver(
     onMessage: (msg: InboundMessage) => handleWsMessage(ctx, bridge, msg, myActorId),
     onState: (state, detail) => {
       ctx.logger.info(`[tmim-ws] ${state}${detail ? ` (${detail})` : ''}`)
+      trace('[ws]', { state, detail })
     },
     onAuthenticated: (info) => {
       myActorId = info.actorId
       ctx.logger.info(`[tmim-ws] authenticated as actor ${info.actorId}${info.handle ? ` (${info.handle})` : ''}`)
+      trace('[ws] authenticated', { actorId: info.actorId, handle: info.handle })
     },
   })
   client.start()
@@ -294,6 +297,7 @@ function handleWsMessage(
   }
   const replyTo = Number(msg.replyTo) || undefined
   ctx.logger.info(`[tmim] WS push -> ingest conv=${msg.convId} sender=${msg.senderId} text=${JSON.stringify(text.slice(0, 80))}`)
+  trace('[ws] push received', { convId: msg.convId, senderId: msg.senderId, text: text.slice(0, 80), myActorId })
   bridge
     .ingestMessage({
       convId: msg.convId,
