@@ -91,7 +91,9 @@ export const Config = (z.object({
 
 export const name = 'tmim'
 
-apply.inject = ['tools', 'agents']
+export const inject = ['tools', 'agents']
+
+apply.inject = inject
 
 export async function apply(ctx: Context, config: Config): Promise<void> {
   if (config.webhook.enabled && !config.webhook.secret) {
