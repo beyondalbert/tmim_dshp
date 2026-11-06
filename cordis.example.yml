@@ -13,7 +13,12 @@
     cwd: './'
     tools: true
     enableAgentTakeover: true
-    webhook:
+    # Inbound: WebSocket long-connection (recommended, no public HTTPS needed).
+    ws:
       enabled: true
-      path: '/tm/callback'              # must be publicly reachable HTTPS
-      secret: 'whsec_3a7f9c2e5b8d1046'  # issued by TM IM when WEBHOOK is enabled
+      # url: 'wss://tmim.example.com/ws'   # optional; defaults to baseUrl host
+    # Alternative inbound: webhook (requires public HTTPS + one-time secret)
+    # webhook:
+    #   enabled: true
+    #   path: '/tm/callback'
+    #   secret: 'whsec_3a7f9c2e5b8d1046'

@@ -27,6 +27,7 @@ import { TmimClient } from './tmim-client.ts'
 import { mountTmimWebhook, type WebhookEvent } from './webhook.ts'
 import { TmimBridge } from './bridge.ts'
 import { registerTmimTools } from './tools.ts'
+import { TmimWsClient, type InboundMessage } from './ws-client.ts'
 
 // ---- Config ----
 
@@ -52,6 +53,14 @@ export type Config = {
   credential?: Credential
   deviceId: string
   webhook: WebhookConfig
+  /** Use the TM IM WebSocket long-connection to receive inbound messages in real time. */
+  ws: {
+    enabled: boolean
+    /** WS URL; defaults to ws(s)://<baseUrl host>/ws. */
+    url: string
+    /** Heartbeat interval, ms. */
+    heartbeatMs: number
+  }
   enableAgentTakeover: boolean
   agent: AgentConfig
   cwd: string
@@ -79,6 +88,11 @@ export const Config = (z.object({
     path: z.string().default('/tm/callback').description('WEBHOOK 回调路径；对应 TM IM 的 endpoint_url'),
     secret: z.string().role('secret').default('').description('WEBHOOK 签名密钥（webhook_secret），启用时必填；由 TM IM 签发'),
     maxSkewSeconds: z.number().default(300).description('防重放的签名时间戳容忍偏差上限（秒）'),
+  }),
+  ws: z.object({
+    enabled: z.boolean().default(true).description('是否通过 WebSocket 长连接实时接收 TM IM 消息（推荐）'),
+    url: z.string().default('').description('WebSocket 地址，留空则按 baseUrl 自动推导为 ws(s)://<host>/ws'),
+    heartbeatMs: z.number().default(25000).description('心跳间隔（毫秒）'),
   }),
   enableAgentTakeover: z.boolean().default(false).description('启动时是否自动 POST 开启 Agent Takeover 配置（需要已配置凭证）'),
   agent: z.object({
@@ -166,12 +180,21 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         })
       }
 
+      if (config.ws.enabled) {
+        yield startWsReceiver(scoped, config, bridge)
+      }
+
       if (config.tools) {
         yield registerTmimTools(scoped, () => client)
       }
 
       yield bridge.start()
-      ctx.logger.info('[tmim] started (webhook=%s, tools=%s)', config.webhook.enabled, config.tools)
+      ctx.logger.info(
+        '[tmim] started (webhook=%s, ws=%s, tools=%s)',
+        config.webhook.enabled,
+        config.ws.enabled,
+        config.tools,
+      )
     }, 'tmim')
   })
 }
@@ -186,6 +209,61 @@ function handleWebhookEvent(bridge: TmimBridge, event: WebhookEvent): void {
     convId: Number(data.conv_id),
     senderId: Number(data.sender_id),
     text: data.content?.text,
+    ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
+  })
+}
+
+/** Build the WebSocket URL from the config, defaulting to the baseUrl host. */
+function deriveWsUrl(baseUrl: string, configured: string): string {
+  if (configured) return configured
+  const isSecure = /^https:/.test(baseUrl)
+  const host = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  return `${isSecure ? 'wss' : 'ws'}://${host}/ws`
+}
+
+/** Create & start the TM IM WebSocket receiver; returns a disposer. */
+function startWsReceiver(
+  ctx: Context,
+  config: Config,
+  bridge: TmimBridge,
+): () => void {
+  const token = config.credential?.kind === 'apikey' ? config.credential.token : ''
+  const client = new TmimWsClient({
+    url: deriveWsUrl(config.baseUrl, config.ws.url),
+    token,
+    clientVersion: 'dsh-tmim-1.0.0',
+    deviceId: config.deviceId,
+    heartbeatMs: config.ws.heartbeatMs,
+    onMessage: (msg: InboundMessage) => handleWsMessage(bridge, msg),
+    onState: (state, detail) => {
+      ctx.logger.debug(`[tmim-ws] ${state}${detail ? ` (${detail})` : ''}`)
+    },
+    onAuthenticated: (info) => {
+      ctx.logger.info(`[tmim-ws] authenticated as actor ${info.actorId}${info.handle ? ` (${info.handle})` : ''}`)
+    },
+  })
+  client.start()
+  return () => client.stop()
+}
+
+/** Route a decoded WS PUSH message into the bridge as a user message. */
+function handleWsMessage(bridge: TmimBridge, msg: InboundMessage): void {
+  if (msg.msgType !== 1) return // only text
+  // Skip empty text.
+  if (!msg.contentJson) return
+  let content: { text?: string } | null = null
+  try {
+    content = JSON.parse(msg.contentJson)
+  } catch {
+    return
+  }
+  const text = content?.text
+  if (!text) return
+  const replyTo = Number(msg.replyTo) || undefined
+  void bridge.ingestMessage({
+    convId: msg.convId,
+    senderId: msg.senderId,
+    text,
     ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
   })
 }

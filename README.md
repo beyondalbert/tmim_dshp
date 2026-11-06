@@ -41,10 +41,15 @@ Add the plugin to your Cordis composition (`cordis.yml`):
     credential:
       kind: 'apikey'          # or: kind: 'password', username, password
       token: 'tm_xxxxxxxx'
-    webhook:
-      enabled: true
-      path: '/tm/callback'
-      secret: 'whsec_...'     # issued by TM IM when WEBHOOK push mode enabled
+    # WS mode (recommended) — realtime, no public HTTPS needed.
+    ws:
+      enabled: true            # default
+      # url: 'wss://tmim.example.com/ws'   # optional; defaults to baseUrl host
+    # Alternative push mode (requires public HTTPS + a one-time webhook_secret):
+    # webhook:
+    #   enabled: true
+    #   path: '/tm/callback'
+    #   secret: 'whsec_...'
     agent:
       provider: 'deepseek-official'
       model: 'deepseek-chat'
@@ -61,7 +66,10 @@ Add the plugin to your Cordis composition (`cordis.yml`):
 | `credential.username`/`password` | string | — | TM IM login (when `password`). |
 | `deviceId` | string | `dsh-<pid>` | Reported via `X-TM-Device-Id`. |
 | `enableAgentTakeover` | boolean | `false` | POST takeover config on startup. |
-| `webhook.enabled` | boolean | `false` | Mount the webhook receiver. |
+| `ws.enabled` | boolean | `true` | Receive inbound messages via WebSocket long-connection. |
+| `ws.url` | string | derived | `ws(s)://<baseUrl host>/ws` unless overridden. |
+| `ws.heartbeatMs` | number | `25000` | Heartbeat interval (ms). |
+| `webhook.enabled` | boolean | `false` | Mount the webhook receiver (alternative to WS). |
 | `webhook.path` | string | `/tm/callback` | URL path; must be public HTTPS. |
 | `webhook.secret` | string | `''` | `webhook_secret` (required when enabled). |
 | `webhook.maxSkewSeconds` | number | `300` | Replay-protection clock skew. |
@@ -74,14 +82,22 @@ Add the plugin to your Cordis composition (`cordis.yml`):
 
 ## How the bridge works
 
-1. TM IM POSTs an event to `webhook.path` with an `X-TM-Signature`.
-2. The receiver verifies `HMAC-SHA256(secret, "<ts>.<rawBody>")` and freshness,
-   then returns `200` immediately (the 5-second budget is only for the HTTP
-   return, not for LLM work).
-3. A unique Harness session per TM IM conversation (`tmim:<convId>`) is created
-   and the inbound text is fed via `agent.followup(createUserMessage(...))`.
-4. `session/event` `assistant/message` events are observed and the final text
-   reply is sent back to the conversation with `POST /v1/conversations/{id}/messages`.
+The plugin receives inbound TM IM messages **via a WebSocket long-connection by
+default** (`ws.enabled: true`):
+
+1. On startup it connects to `ws(s)://<host>/ws` and sends the first frame
+   `CMD_AUTH` carrying the Agent api_key.
+2. Once authenticated (`CMD_AUTH_OK`), the server pushes new messages to the
+   socket as `CMD_PUSH` frames, which the plugin feeds into a per-conversation
+   Harness session (`tmim:<convId>`).
+3. `session/event` `assistant/message` events are observed and the final text
+   reply is sent back via REST `POST /v1/conversations/{id}/messages`.
+4. Heartbeat (`CMD_PING`/`CMD_PONG`) keeps the connection alive; it reconnects
+   with backoff if dropped.
+
+> If you prefer **webhook** delivery instead (push, needs a public HTTPS
+> endpoint): set `ws.enabled: false` and `webhook.enabled: true` with a
+> `webhook.secret`. Only one inbound mode is used at a time is recommended.
 
 Restart-safe resume uses the same session id, so conversation context carries
 across restarts.
