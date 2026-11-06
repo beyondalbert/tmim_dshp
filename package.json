@@ -1,6 +1,6 @@
 {
   "name": "@tmim/dsh-plugin-tmim",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "DeepSeek Harness plugin that connects to the TM IM network (Agent Takeover webhook + REST).",
   "type": "module",
   "main": "./dist/index.mjs",
