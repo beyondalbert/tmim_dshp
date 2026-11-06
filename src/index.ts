@@ -165,7 +165,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   await ctx.inject(['tools', 'agents'], (scoped) => {
     const bridge = new TmimBridge(scoped, {
       getClient: () => client,
-      agentOptions: { provider: config.agent.provider, model: config.agent.model },
+      agentOptions: toAgentOptions(config.agent),
       cwd: config.cwd,
     })
 
@@ -223,6 +223,16 @@ function deriveWsUrl(baseUrl: string, configured: string): string {
   return `${isSecure ? 'wss' : 'ws'}://${host}/ws`
 }
 
+/**
+ * Resolve agent model options. When neither provider nor model is set, return
+ * undefined so the host's configured default model route (which is known to
+ * work) is used; only force provider/model when both are explicitly configured.
+ */
+function toAgentOptions(agent: AgentConfig): { provider: string; model: string } | undefined {
+  if (!agent.provider && !agent.model) return undefined
+  return { provider: agent.provider, model: agent.model }
+}
+
 /** Create & start the TM IM WebSocket receiver; returns a disposer. */
 function startWsReceiver(
   ctx: Context,
@@ -230,17 +240,19 @@ function startWsReceiver(
   bridge: TmimBridge,
 ): () => void {
   const token = config.credential?.kind === 'apikey' ? config.credential.token : ''
+  let myActorId: string | null = null
   const client = new TmimWsClient({
     url: deriveWsUrl(config.baseUrl, config.ws.url),
     token,
     clientVersion: 'dsh-tmim-1.0.0',
     deviceId: config.deviceId,
     heartbeatMs: config.ws.heartbeatMs,
-    onMessage: (msg: InboundMessage) => handleWsMessage(ctx, bridge, msg),
+    onMessage: (msg: InboundMessage) => handleWsMessage(ctx, bridge, msg, myActorId),
     onState: (state, detail) => {
       ctx.logger.info(`[tmim-ws] ${state}${detail ? ` (${detail})` : ''}`)
     },
     onAuthenticated: (info) => {
+      myActorId = info.actorId
       ctx.logger.info(`[tmim-ws] authenticated as actor ${info.actorId}${info.handle ? ` (${info.handle})` : ''}`)
     },
   })
@@ -249,9 +261,19 @@ function startWsReceiver(
 }
 
 /** Route a decoded WS PUSH message into the bridge as a user message. */
-function handleWsMessage(ctx: Context, bridge: TmimBridge, msg: InboundMessage): void {
+function handleWsMessage(
+  ctx: Context,
+  bridge: TmimBridge,
+  msg: InboundMessage,
+  myActorId: string | null,
+): void {
   if (msg.msgType !== 1) {
     ctx.logger.info(`[tmim] ignored push msgType=${msg.msgType}`)
+    return
+  }
+  // Skip our own echoed messages (agent's own replies pushed back to us).
+  if (myActorId !== null && String(msg.senderId) === String(myActorId)) {
+    ctx.logger.debug(`[tmim] skipped own echo sender=${msg.senderId}`)
     return
   }
   if (!msg.contentJson) {

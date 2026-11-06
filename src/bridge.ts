@@ -17,8 +17,8 @@ import type { TmimClient } from './tmim-client.ts'
 export interface BridgeOptions {
   /** Provide the authenticated TM IM client. */
   getClient: () => TmimClient
-  /** Provider/model selection passed to `ctx.agents.create`. */
-  agentOptions: { provider: string; model: string }
+  /** Provider/model selection passed to `ctx.agents.create`; omit to use host default. */
+  agentOptions?: { provider: string; model: string }
   /** Working directory for newly-created agents. */
   cwd?: string
 }
