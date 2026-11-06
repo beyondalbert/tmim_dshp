@@ -48,7 +48,8 @@ export type Credential =
 
 export type Config = {
   baseUrl: string
-  credential: Credential
+  /** Optional until a TM IM connection is actually needed. */
+  credential?: Credential
   deviceId: string
   webhook: WebhookConfig
   enableAgentTakeover: boolean
@@ -58,7 +59,7 @@ export type Config = {
 }
 
 export const Config = (z.object({
-  baseUrl: z.string().required().description(
+  baseUrl: z.string().default('http://tmim.stkg.ltd/').description(
     'TM IM 服务器地址（不带 /v1 后缀）。例如：https://tmim.example.com',
   ),
   credential: z.union([
@@ -71,7 +72,7 @@ export const Config = (z.object({
       username: z.string().required().description('TM IM 登录账号'),
       password: z.string().role('secret').required().description('TM IM 登录密码'),
     }),
-  ]),
+  ]).default({ kind: 'apikey', token: '' } as const).description('TM IM 连接凭证，可选；缺省时插件仍会启动，但只有配置凭证后才能收发消息'),
   deviceId: z.string().default(`dsh-${process.pid}`).description('设备标识，会随请求上报（X-TM-Device-Id）'),
   webhook: z.object({
     enabled: z.boolean().default(false).description('是否开启 WEBHOOK 实时接收消息（需要公网可达的 HTTPS endpoint）'),
@@ -79,10 +80,10 @@ export const Config = (z.object({
     secret: z.string().role('secret').default('').description('WEBHOOK 签名密钥（webhook_secret），启用时必填；由 TM IM 签发'),
     maxSkewSeconds: z.number().default(300).description('防重放的签名时间戳容忍偏差上限（秒）'),
   }),
-  enableAgentTakeover: z.boolean().default(false).description('启动时是否自动 POST 开启 Agent Takeover 配置'),
+  enableAgentTakeover: z.boolean().default(false).description('启动时是否自动 POST 开启 Agent Takeover 配置（需要已配置凭证）'),
   agent: z.object({
     provider: z.string().default('deepseek-official').description('应答所用的模型提供商'),
-    model: z.string().required().description('应答所用的模型名，如 deepseek-chat'),
+    model: z.string().default('deepseek-chat').description('应答所用的模型名，如 deepseek-chat'),
   }),
   cwd: z.string().default(process.cwd()).description('工作目录'),
   tools: z.boolean().default(true).description('是否向智能体注册主动式的 TM IM 工具（发消息/建会话等）'),
@@ -97,33 +98,46 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
   const client = new TmimClient({
     baseUrl: config.baseUrl,
-    ...(config.credential.kind === 'apikey' ? { token: config.credential.token } : {}),
+    ...(config.credential?.kind === 'apikey' && config.credential.token ? { token: config.credential.token } : {}),
     deviceId: config.deviceId,
   })
 
-  // Authenticate up-front so misconfiguration fails loudly at boot.
-  if (config.credential.kind === 'password') {
-    await client.login(config.credential.username, config.credential.password)
+  // Optional credential: the plugin starts without one so it can be configured
+  // later, but cannot authenticate until a token/credentials are supplied.
+  const hasCredential =
+    (config.credential?.kind === 'apikey' && !!config.credential.token) ||
+    (config.credential?.kind === 'password' && !!config.credential.password)
+  if (!hasCredential) {
+    ctx.logger.warn(
+      '[tmim] no credential configured — plugin started in idle mode. ' +
+        'Configure credential (Agent api_key or password) to enable messaging.',
+    )
+  } else if (config.credential!.kind === 'password') {
+    await client.login(config.credential!.username, config.credential!.password)
     ctx.logger.info('[tmim] authenticated via password login')
   } else {
-    client.setToken(config.credential.token)
+    client.setToken(config.credential!.token)
     ctx.logger.info('[tmim] using Agent api key')
   }
 
-  // Optionally drive Agent Takeover configuration.
+  // Optionally drive Agent Takeover configuration (only if credentials exist).
   if (config.enableAgentTakeover) {
-    const setup = await client.configureAgentTakeover({
-      ...(config.webhook.enabled
-        ? { pushMode: 1 as const, endpointUrl: config.webhook.path }
-        : { pushMode: 3 as const }), // WEBHOOK or PULL
-      capabilities: ['text'],
-      modelInfo: config.agent.model,
-    })
-    if (setup.webhookSecret && config.webhook.enabled) {
-      ctx.logger.warn(
-        '[tmim] NEW webhook_secret issued (shown only once) — save it and set webhook.secret. ' +
-          'Rotate anytime via POST /v1/me/agent-takeover/rotate-webhook-secret',
-      )
+    if (!hasCredential) {
+      ctx.logger.warn('[tmim] enableAgentTakeover requires a credential; skipping takeover setup')
+    } else {
+      const setup = await client.configureAgentTakeover({
+        ...(config.webhook.enabled
+          ? { pushMode: 1 as const, endpointUrl: config.webhook.path }
+          : { pushMode: 3 as const }), // WEBHOOK or PULL
+        capabilities: ['text'],
+        modelInfo: config.agent.model,
+      })
+      if (setup.webhookSecret && config.webhook.enabled) {
+        ctx.logger.warn(
+          '[tmim] NEW webhook_secret issued (shown only once) — save it and set webhook.secret. ' +
+            'Rotate anytime via POST /v1/me/agent-takeover/rotate-webhook-secret',
+        )
+      }
     }
   }
 
