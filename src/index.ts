@@ -58,29 +58,34 @@ export type Config = {
 }
 
 export const Config = (z.object({
-  baseUrl: z.string().required(),
+  baseUrl: z.string().required().description(
+    'TM IM 服务器地址（不带 /v1 后缀）。例如：https://tmim.example.com',
+  ),
   credential: z.union([
-    z.object({ kind: z.const('apikey'), token: z.string().required() }),
     z.object({
-      kind: z.const('password'),
-      username: z.string().required(),
-      password: z.string().required(),
+      kind: z.const('apikey').description('使用 Agent Takeover 的 api_key（sk_… 开头，长期有效）'),
+      token: z.string().role('secret').required().description('Agent Takeover api_key，在 TM IM 的「Agent 接管」页开启时获取'),
+    }),
+    z.object({
+      kind: z.const('password').description('使用 TM IM 登录账号和密码'),
+      username: z.string().required().description('TM IM 登录账号'),
+      password: z.string().role('secret').required().description('TM IM 登录密码'),
     }),
   ]),
-  deviceId: z.string().default(`dsh-${process.pid}`),
+  deviceId: z.string().default(`dsh-${process.pid}`).description('设备标识，会随请求上报（X-TM-Device-Id）'),
   webhook: z.object({
-    enabled: z.boolean().default(false),
-    path: z.string().default('/tm/callback'),
-    secret: z.string().default(''),
-    maxSkewSeconds: z.number().default(300),
+    enabled: z.boolean().default(false).description('是否开启 WEBHOOK 实时接收消息（需要公网可达的 HTTPS endpoint）'),
+    path: z.string().default('/tm/callback').description('WEBHOOK 回调路径；对应 TM IM 的 endpoint_url'),
+    secret: z.string().role('secret').default('').description('WEBHOOK 签名密钥（webhook_secret），启用时必填；由 TM IM 签发'),
+    maxSkewSeconds: z.number().default(300).description('防重放的签名时间戳容忍偏差上限（秒）'),
   }),
-  enableAgentTakeover: z.boolean().default(false),
+  enableAgentTakeover: z.boolean().default(false).description('启动时是否自动 POST 开启 Agent Takeover 配置'),
   agent: z.object({
-    provider: z.string().default('deepseek-official'),
-    model: z.string().required(),
+    provider: z.string().default('deepseek-official').description('应答所用的模型提供商'),
+    model: z.string().required().description('应答所用的模型名，如 deepseek-chat'),
   }),
-  cwd: z.string().default(process.cwd()),
-  tools: z.boolean().default(true),
+  cwd: z.string().default(process.cwd()).description('工作目录'),
+  tools: z.boolean().default(true).description('是否向智能体注册主动式的 TM IM 工具（发消息/建会话等）'),
 }) as unknown) as Config
 
 export const name = 'tmim'
