@@ -27,9 +27,10 @@ const MSG_TYPE_TEXT = 1
 
 export interface InboundMessage {
   messageId: string
-  convId: number
+  /** Conversation id. This is a snowflake id > Number.MAX_SAFE_INTEGER, so it is a string. */
+  convId: string
   seq: number
-  senderId: number
+  senderId: string
   msgType: number
   contentJson: string
   replyTo: string
@@ -121,9 +122,9 @@ export function decodeFrame(buf: Uint8): RawFrame {
 
 export function decodeMessage(body: Uint8): {
   messageId: string
-  convId: number
+  convId: string
   seq: number
-  senderId: number
+  senderId: string
   msgType: number
   contentJson: string
   replyTo: string
@@ -131,9 +132,9 @@ export function decodeMessage(body: Uint8): {
 } {
   const out = {
     messageId: '0',
-    convId: 0,
+    convId: '0',
     seq: 0,
-    senderId: 0,
+    senderId: '0',
     msgType: 0,
     contentJson: '',
     replyTo: '0',
@@ -157,13 +158,13 @@ export function decodeMessage(body: Uint8): {
           out.messageId = v.toString()
           break
         case 2:
-          out.convId = Number(v)
+          out.convId = v.toString()
           break
         case 3:
           out.seq = Number(v)
           break
         case 4:
-          out.senderId = Number(v)
+          out.senderId = v.toString()
           break
         case 5:
           out.msgType = Number(v)

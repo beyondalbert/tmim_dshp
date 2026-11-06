@@ -205,11 +205,11 @@ function handleWebhookEvent(ctx: Context, bridge: TmimBridge, event: WebhookEven
   const data = event.data as { sender?: { actor_type?: number } } & Record<string, any>
   // Skip messages the agent itself sent (actor_type === 2 is an Agent).
   if (data.sender?.actor_type === 2) return
-  const replyTo = Number(data.reply_to ?? 0) || undefined
+  const replyTo = data.reply_to == null || data.reply_to === 0 ? undefined : String(data.reply_to)
   bridge
     .ingestMessage({
-      convId: Number(data.conv_id),
-      senderId: Number(data.sender_id),
+      convId: String(data.conv_id),
+      senderId: String(data.sender_id),
       text: data.content?.text,
       ...(replyTo === undefined ? {} : { replyToMessageId: replyTo }),
     })
@@ -295,7 +295,7 @@ function handleWsMessage(
     ctx.logger.info(`[tmim] push has no text content`)
     return
   }
-  const replyTo = Number(msg.replyTo) || undefined
+  const replyTo = msg.replyTo === '0' ? undefined : String(msg.replyTo)
   ctx.logger.info(`[tmim] WS push -> ingest conv=${msg.convId} sender=${msg.senderId} text=${JSON.stringify(text.slice(0, 80))}`)
   trace('[ws] push received', { convId: msg.convId, senderId: msg.senderId, text: text.slice(0, 80), myActorId })
   bridge

@@ -259,7 +259,7 @@ export class TmimClient {
    * Send a text message. `clientMsgId` is the idempotency key; re-sending the
    * same key returns the identical original message (no duplicate).
    */
-  async sendText(convId: number, text: string, clientMsgId: string, replyTo?: number): Promise<{
+  async sendText(convId: number | string, text: string, clientMsgId: string, replyTo?: number): Promise<{
     messageId: number
     convId: number
     seq: number

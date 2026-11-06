@@ -45,10 +45,10 @@ export class TmimBridge {
 
   /** Accept one verified inbound tmim event (message.created / mention.created). */
   async ingestMessage(args: {
-    convId: number
-    senderId: number
+    convId: string
+    senderId: string
     text?: string
-    replyToMessageId?: number
+    replyToMessageId?: string
   }): Promise<{ sessionId: string }> {
     const convId = args.convId
     const sessionIdStr = this.sessionIdFor(convId)
@@ -75,7 +75,7 @@ export class TmimBridge {
 
   /** Get a live agent for a conversation, creating or resuming it as needed. */
   private async ensureAgent(
-    convId: number,
+    convId: string,
     sessionIdStr: string,
     sessionId: SessionId,
   ): Promise<{ followup: (m: UserMessage) => void } | null> {
@@ -122,19 +122,18 @@ export class TmimBridge {
 
   // ---- internals ----
 
-  private sessionIdFor(convId: number): string {
+  private sessionIdFor(convId: string): string {
     return `tmim:${convId}`
   }
 
-  private convIdFor(sessionId: SessionId): number | undefined {
+  private convIdFor(sessionId: SessionId): string | undefined {
     const s = String(sessionId)
     if (!s.startsWith('tmim:')) return undefined
-    const n = Number(s.slice('tmim:'.length))
-    return Number.isFinite(n) ? n : undefined
+    return s.slice('tmim:'.length) || undefined
   }
 
   private async relayAssistant(
-    convId: number,
+    convId: string,
     event: { data: { message?: { content?: Array<{ type: string; text?: string }> } } },
   ): Promise<void> {
     const text = textOf(event.data.message)
