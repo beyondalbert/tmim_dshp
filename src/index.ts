@@ -234,9 +234,9 @@ function startWsReceiver(
     clientVersion: 'dsh-tmim-1.0.0',
     deviceId: config.deviceId,
     heartbeatMs: config.ws.heartbeatMs,
-    onMessage: (msg: InboundMessage) => handleWsMessage(bridge, msg),
+    onMessage: (msg: InboundMessage) => handleWsMessage(ctx, bridge, msg),
     onState: (state, detail) => {
-      ctx.logger.debug(`[tmim-ws] ${state}${detail ? ` (${detail})` : ''}`)
+      ctx.logger.info(`[tmim-ws] ${state}${detail ? ` (${detail})` : ''}`)
     },
     onAuthenticated: (info) => {
       ctx.logger.info(`[tmim-ws] authenticated as actor ${info.actorId}${info.handle ? ` (${info.handle})` : ''}`)
@@ -247,19 +247,29 @@ function startWsReceiver(
 }
 
 /** Route a decoded WS PUSH message into the bridge as a user message. */
-function handleWsMessage(bridge: TmimBridge, msg: InboundMessage): void {
-  if (msg.msgType !== 1) return // only text
-  // Skip empty text.
-  if (!msg.contentJson) return
+function handleWsMessage(ctx: Context, bridge: TmimBridge, msg: InboundMessage): void {
+  if (msg.msgType !== 1) {
+    ctx.logger.info(`[tmim] ignored push msgType=${msg.msgType}`)
+    return
+  }
+  if (!msg.contentJson) {
+    ctx.logger.info(`[tmim] ignored push with empty content`)
+    return
+  }
   let content: { text?: string } | null = null
   try {
     content = JSON.parse(msg.contentJson)
   } catch {
+    ctx.logger.error(`[tmim] push content not JSON: ${msg.contentJson}`)
     return
   }
   const text = content?.text
-  if (!text) return
+  if (!text) {
+    ctx.logger.info(`[tmim] push has no text content`)
+    return
+  }
   const replyTo = Number(msg.replyTo) || undefined
+  ctx.logger.info(`[tmim] WS push -> ingest conv=${msg.convId} sender=${msg.senderId} text=${JSON.stringify(text.slice(0, 80))}`)
   void bridge.ingestMessage({
     convId: msg.convId,
     senderId: msg.senderId,

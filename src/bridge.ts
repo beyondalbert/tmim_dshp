@@ -51,17 +51,25 @@ export class TmimBridge {
   }): Promise<{ sessionId: string }> {
     const convId = args.convId
     const sessionIdStr = this.sessionIdFor(convId)
+    this.ctx.logger.info(`[tmim] ingestMessage conv=${convId} session=${sessionIdStr}`)
     let agent = this.ctx.agents.get(sessionIdStr as SessionId)
     if (!agent) {
+      this.ctx.logger.info(`[tmim] creating agent for session=${sessionIdStr}`)
       const handle = await this.ctx.agents.create({
         sessionId: sessionIdStr as SessionId,
         meta: { cwd: this.options.cwd ?? process.cwd() },
         agentOptions: this.options.agentOptions,
       })
       agent = handle.agent
+      this.ctx.logger.info(`[tmim] agent created for session=${sessionIdStr}`)
     }
     const message = buildUserMessage(args.text ?? '')
-    agent.followup(message)
+    try {
+      agent.followup(message)
+      this.ctx.logger.info(`[tmim] followup queued for session=${sessionIdStr}`)
+    } catch (error) {
+      this.ctx.logger.error(`[tmim] followup threw for session=${sessionIdStr}: ${String(error)}`)
+    }
     return { sessionId: sessionIdStr }
   }
 
@@ -83,11 +91,12 @@ export class TmimBridge {
     event: { data: { message?: { content?: Array<{ type: string; text?: string }> } } },
   ): Promise<void> {
     const text = textOf(event.data.message)
+    this.ctx.logger.info(`[tmim] assistant/message relay conv=${convId} text=${JSON.stringify((text ?? '').slice(0, 80))}`)
     if (!text) return
     const client = this.options.getClient()
     try {
       await client.sendText(convId, text, newClientMsgId())
-      this.ctx.logger.debug(`[tmim-bridge] relayed reply to conv ${convId}`)
+      this.ctx.logger.info(`[tmim] relayed reply to conv ${convId}`)
     } catch (error) {
       this.ctx.logger.error(`[tmim-bridge] failed to relay to conv ${convId}: ${String(error)}`)
     }
