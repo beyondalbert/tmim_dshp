@@ -10,12 +10,14 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
-    "README.zh-CN.md"
+    "README.zh-CN.md",
+    "cordis.patch.yml"
   ],
   "scripts": {
     "build": "tsdown",
@@ -32,6 +34,11 @@
     "cordis"
   ],
   "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.1.0",
     "@deepseek-ai/schemastery": "^3.19.0",

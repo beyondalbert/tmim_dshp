@@ -1,0 +1,9 @@
+# TM IM → DeepSeek Harness bridge plugin.
+#
+# Single-plugin bundle: this patch inserts only this package into the
+# active Cordis tree. The set of required provider/services (agent, session,
+# llm, tools) must already be supplied by the surrounding profile.
+
+- insert:
+    - id: tmim
+      name: '@tmim/dsh-plugin-tmim'
