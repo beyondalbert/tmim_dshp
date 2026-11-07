@@ -1,6 +1,6 @@
 {
   "name": "@tmim/dsh-plugin-tmim",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "DeepSeek Harness plugin that connects to the TM IM network (Agent Takeover webhook + REST).",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -10,6 +10,7 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
+    "./client": "./dist/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -20,7 +21,8 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node scripts/build-client.mjs",
+    "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:signature": "vitest run tests/verify-signature.test.ts"
@@ -37,16 +39,28 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
     }
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.1.0",
-    "@deepseek-ai/schemastery": "^3.19.0",
     "@deepseek-ai/dsh-agent": "^0.2.1-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-llm": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-session": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-tools": "^0.2.1-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "^0.2.1-rc.1"
+    "@deepseek-ai/schemastery": "^3.19.0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-llm": {
@@ -58,15 +72,27 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.1.0",
-    "@deepseek-ai/schemastery": "^3.19.0",
     "@deepseek-ai/dsh-agent": "^0.2.1-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-store": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.2.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-llm": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-session": "^0.2.1-rc.1",
     "@deepseek-ai/dsh-tools": "^0.2.1-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "^0.2.1-rc.1",
+    "@deepseek-ai/schemastery": "^3.19.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tsdown": "^0.23.5",
+    "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
 }

@@ -16,3 +16,6 @@ lefthook.yml
 node24_dir.html
 node*.zip
 node-v*-win-*/
+
+.tmp-dsh-im-ref
+dsh-im-ref

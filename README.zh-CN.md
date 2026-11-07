@@ -65,7 +65,11 @@ dsh plugin --profile desktop add "@tmim/dsh-plugin-tmim@0.1.16"
     enableAgentTakeover: true
 ```
 
-> 也可以在桌面版 **设置 → Plugin / 插件** 界面里填写同样的配置项。
+> 也可以在桌面版 **设置 → 插件 → TM IM** 界面里填写同样的配置项（推荐，保存即生效并写入
+> `cordis.patch.yml`）。配置界面由插件的客户端 bundle 提供：在侧边的 **插件（Plugins）** 页面点开
+> `@tmim/dsh-plugin-tmim` 即可看到“TM IM”设置表单。
+
+### 2.1 通过 YAML 配置（备选）
 
 ### 3. 重启并验证
 
