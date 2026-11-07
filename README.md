@@ -60,10 +60,11 @@ Add the plugin to your Cordis composition (`cordis.yml`):
     enableAgentTakeover: true
 ```
 
-> 💡 You can also configure every field through the **Settings → Plugins → TM IM**
-> UI (recommended): the plugin ships a client bundle that renders a form on the
-> **Plugins** page under `@tmim/dsh-plugin-tmim`. Saving writes the same values to
-> `cordis.patch.yml` and applies them to the running bridge immediately.
+> 💡 You can also configure every field through the **TM IM panel** in the
+> left sidebar (recommended): the plugin ships a client bundle that registers a
+> sidebar entry (next to Automation Tasks) opening a settings form. Saving
+> writes the same values to `cordis.patch.yml` and applies them to the running
+> bridge immediately.
 
 ## Configuration
 

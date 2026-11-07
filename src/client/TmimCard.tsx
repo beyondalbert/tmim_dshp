@@ -7,7 +7,7 @@ import {
 import type {
   InjectFace, PropsLocale, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TmimCardFace, TmimCardView } from './tmim-card-controller.ts'
 import type { TmimLocaleKey } from './locales.ts'
@@ -15,7 +15,7 @@ import type { TmimLocaleKey } from './locales.ts'
 /** Rendered props for the TM IM settings entry. */
 export type TmimCardProps =
   PropsLocale<'settings.tmim'>
-  & PropsRuntime<'plugins.item'>
+  & PropsRuntime<'main'>
   & InjectFace<TmimCardFace>
 
 function TextRow(props: {
@@ -79,16 +79,12 @@ function Section(props: { title: string; children: React.ReactNode }) {
 /**
  * The TM IM settings page: connection, credential, inbound delivery, agent,
  * and advanced fields, staged through the injected controller and saved as
- * one atomic, revision-fenced mutation. The summary view is a one-liner.
+ * one atomic, revision-fenced mutation.
  */
 export function TmimCard(props: TmimCardProps) {
   const t = props.t
   const view = props.useTmim((s: TmimCardView) => s)
   const key = (k: TmimLocaleKey): string => t(k as never)
-
-  if (props.view === 'summary') {
-    return <>{key('description')}</>
-  }
 
   const v = view.value
   const disabled = !view.writable

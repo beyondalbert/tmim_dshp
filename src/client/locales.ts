@@ -1,6 +1,7 @@
 /** Bilingual copy for the TM IM settings page. */
 export const en = {
   title: 'TM IM',
+  panel: 'TM IM',
   description: 'Bridge TM IM messages to a DeepSeek Harness agent.',
   unavailable: 'TM IM is not composed in this deployment.',
   readOnly: 'TM IM settings are read-only in this deployment.',
@@ -61,6 +62,7 @@ export const en = {
 
 export const zh = {
   title: 'TM IM',
+  panel: 'TM IM',
   description: '把 TM IM 消息桥接到 DeepSeek Harness 智能体。',
   unavailable: '当前部署没有装配 TM IM。',
   readOnly: '当前部署中 TM IM 设置为只读。',
