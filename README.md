@@ -2,6 +2,8 @@
 
 > 🇬🇧 English · 🇨🇳 [简体中文](README.zh-CN.md)（中文说明文档）
 
+**A one-liner:** `@tmim/dsh-plugin-tmim` is a DeepSeek Harness plugin that bridges the TM IM network to a Harness agent—ingesting inbound messages via WebSocket (or webhook), driving agent turns, and relaying replies and proactive tools (sending messages, managing conversations, pulling history) back to TM IM.
+
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that
 connects the harness to the **TM IM** network. It turns TM IM into a message
 channel for a Harness agent:

@@ -2,6 +2,8 @@
 
 > 🇬🇧 [English README](README.md) · 🇨🇳 简体中文
 
+**一句话简介**：`@tmim/dsh-plugin-tmim` 是一个 DeepSeek Harness 插件，通过 WebSocket 长连接（或 webhook）接收入站消息、驱动 Harness 智能体作答，并把回复连同主动式工具（发消息、建会话、查历史等）能力一起回接到 TM IM 网络。
+
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件，用于将
 Harness 接入 **TM IM** 网络。它把 TM IM 变成 Harness 智能体的消息通道：
 
