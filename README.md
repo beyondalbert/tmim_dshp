@@ -74,6 +74,8 @@ Add the plugin to your Cordis composition (`cordis.yml`):
 | `webhook.secret` | string | `''` | `webhook_secret` (required when enabled). |
 | `webhook.maxSkewSeconds` | number | `300` | Replay-protection clock skew. |
 | `agent.provider` / `agent.model` | string | — | Model the bridged agent turn uses. |
+| `agentPreset` | string | `''` | Agent preset to mount per conversation agent. Empty = host default (desktop profile keeps tools behind presets; mounting the preset restores the agent's full tool set). `inert` disables preset mounting. |
+| `cwd` | string | `process.cwd()` | Working directory for new agents. |
 | `tools` | boolean | `true` | Register proactive TM IM tools. |
 | `relay` | boolean | `true` | Relay assistant replies to TM IM. |
 

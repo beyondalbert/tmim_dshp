@@ -64,6 +64,8 @@ export type Config = {
   }
   enableAgentTakeover: boolean
   agent: AgentConfig
+  /** Agent preset to mount for each TM IM conversation agent; empty = host default. */
+  agentPreset: string
   cwd: string
   tools: boolean
 }
@@ -96,6 +98,7 @@ export const Config = (z.object({
     heartbeatMs: z.number().default(25000).description('心跳间隔（毫秒）'),
   }),
   enableAgentTakeover: z.boolean().default(false).description('启动时是否自动 POST 开启 Agent Takeover 配置（需要已配置凭证）'),
+  agentPreset: z.string().default('').description('每个 TM IM 会话智能体挂载的 Agent preset；留空则使用宿主默认 preset（桌面版把工具都放在 preset 里）'),
   agent: z.object({
     provider: z.string().default('deepseek-official').description('应答所用的模型提供商'),
     model: z.string().default('deepseek-chat').description('应答所用的模型名，如 deepseek-chat'),
@@ -167,6 +170,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     const bridge = new TmimBridge(scoped, {
       getClient: () => client,
       agentOptions: toAgentOptions(config.agent),
+      agentPreset: config.agentPreset,
       cwd: config.cwd,
     })
 

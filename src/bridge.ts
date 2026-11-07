@@ -22,6 +22,12 @@ export interface BridgeOptions {
   agentOptions?: { provider: string; model: string }
   /** Working directory for newly-created agents. */
   cwd?: string
+  /**
+   * Agent preset to mount for each conversation agent. When empty, the host's
+   * configured default preset is used (the desktop profile composes its tool
+   * set behind presets). Pass `'inert'` to opt out of mounting a preset.
+   */
+  agentPreset?: string
 }
 
 export class TmimBridge {
@@ -86,12 +92,17 @@ export class TmimBridge {
     }
     // Try to create a fresh agent; the session may already be persisted from a
     // previous run (SessionAlreadyExists), in which case resume it instead.
+    const composition = await this.composeSetup()
+    const meta: Record<string, unknown> = { cwd: this.options.cwd ?? process.cwd() }
+    if (composition.agentPreset !== undefined) meta.agentPreset = composition.agentPreset
+    const setup = composition.setup
     try {
-      trace('[ensureAgent] creating', { sessionIdStr })
+      trace('[ensureAgent] creating', { sessionIdStr, agentPreset: composition.agentPreset })
       const handle = await this.ctx.agents.create({
         sessionId,
-        meta: { cwd: this.options.cwd ?? process.cwd() },
+        meta,
         agentOptions: this.options.agentOptions,
+        setup,
       })
       this.ctx.logger.info(`[tmim] agent created for session=${sessionIdStr}`)
       trace('[ensureAgent] created OK', { sessionIdStr })
@@ -105,6 +116,7 @@ export class TmimBridge {
           const handle = await this.ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: this.options.agentOptions,
+            setup,
           })
           this.ctx.logger.info(`[tmim] agent resumed for session=${sessionIdStr}`)
           trace('[ensureAgent] resume OK', { sessionIdStr })
@@ -117,6 +129,49 @@ export class TmimBridge {
       }
       this.ctx.logger.error(`[tmim] agent create failed conv=${convId}: ${msg}`)
       return null
+    }
+  }
+
+  /**
+   * Resolve the host's agent preset and build the agent `setup` callback that
+   * mounts it, matching how the desktop host composes its own root agents. The
+   * desktop profile keeps all tool plugins behind agent presets (bash, fs, web,
+   * …), so without mounting a preset a plugin-created agent gets an EMPTY scope
+   * and no tools. This restores the host's full capability set.
+   *
+   * When the host exposes no `agentPresets` service, no setup is needed and
+   * tools (if any) are already global.
+   */
+  private async composeSetup(): Promise<{ agentPreset?: string; setup?: (agentCtx: Context) => Promise<void> | void }> {
+    try {
+      const presets = this.ctx.get('agentPresets') as { resolve(id?: string): Promise<{ id: string }>; mount(c: Context, id?: string): Promise<unknown> } | undefined
+      if (!presets) {
+        trace('[composeSetup] no agentPresets service in host', {})
+        return {}
+      }
+      const requested = this.options.agentPreset
+      if (requested === 'inert') {
+        trace('[composeSetup] preset mounting disabled (inert)', {})
+        return {}
+      }
+      // An empty string (schema default) must NOT be forwarded: resolve(id)
+      // falls back to the host default only when id is `undefined`. Passing ''
+      // would look up a preset literally named '' and throw not-found.
+      const requestedOrUndef = requested === undefined || requested === '' ? undefined : requested
+      const resolved = await presets.resolve(requestedOrUndef)
+      const agentPreset = resolved.id
+      return {
+        agentPreset,
+        setup: async (agentCtx: Context) => {
+          await presets.mount(agentCtx, agentPreset)
+        },
+      }
+    } catch (error) {
+      // Never let preset resolution take the bridge down; the agent still runs,
+      // just without preset-scoped tools.
+      this.ctx.logger.warn(`[tmim] could not mount agent preset (agent still works): ${String(error)}`)
+      trace('[composeSetup] preset resolution FAILED', { error: String(error) })
+      return {}
     }
   }
 
