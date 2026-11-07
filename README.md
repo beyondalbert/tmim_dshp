@@ -1,5 +1,7 @@
 # @tmim/dsh-plugin-tmim
 
+> 🇬🇧 English · 🇨🇳 [简体中文](README.zh-CN.md)（中文说明文档）
+
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that
 connects the harness to the **TM IM** network. It turns TM IM into a message
 channel for a Harness agent:
