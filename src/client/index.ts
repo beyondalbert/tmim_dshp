@@ -49,15 +49,18 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'tmim-client: dictionaries')
   const controller = new TmimCardController(ctx)
   ctx.effect(() => () => { controller.dispose() }, 'tmim-client: form subscription')
-  ctx.effect(() => ctx.configForms.whileServed([TMIM_NS], () => {
-    const stopPage = ctx.slots.inject('main', () => ctx.slots.register({
-      name: 'main', key: PANEL_ID, locale: NS,
-      inject: () => controller.inject(),
-    }, TmimCard))
-    const stopSidebar = ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-      name: 'sidebar.panellist', id: PANEL_ID, order: 120,
-      locale: NS, label: () => t('panel'),
-    }, TmimIcon))
-    return () => { stopSidebar(); stopPage() }
-  }), 'tmim-client: page')
+  // Register unconditionally (like dsh-im): the sidebar entry and its main
+  // panel appear as soon as this client bundle is served, independent of
+  // whether the Host exposes a `tmim` settings namespace. When the namespace
+  // isn't composed the page renders read-only/unavailable; when it is, saves
+  // land in cordis.patch.yml and hot-reload the bridge.
+  const stopPage = ctx.slots.inject('main', () => ctx.slots.register({
+    name: 'main', key: PANEL_ID, locale: NS,
+    inject: () => controller.inject(),
+  }, TmimCard))
+  const stopSidebar = ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+    name: 'sidebar.panellist', id: PANEL_ID, order: 120,
+    locale: NS, label: () => t('panel'),
+  }, TmimIcon))
+  ctx.effect(() => () => { stopSidebar(); stopPage() }, 'tmim-client: page')
 }
