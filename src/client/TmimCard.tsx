@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import {
   SettingsForm,
   Checkbox,
   Input,
+  DisclosureRow,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ReactNode } from 'react'
 import type {
   InjectFace, PropsLocale, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -80,12 +83,38 @@ function BoolRow(props: {
   )
 }
 
-function Section(props: { title: string; children: React.ReactNode }) {
+function Section(props: {
+  title: string
+  children: ReactNode
+  /** Omit the top separator; used for the always-visible basic fields. */
+  compact?: boolean
+}) {
   return (
-    <section className="dshTmSection">
+    <section className={props.compact ? 'dshTmSection dshTmSectionCompact' : 'dshTmSection'}>
       <h3 className="dshTmSectionTitle">{props.title}</h3>
       {props.children}
     </section>
+  )
+}
+
+/** Collapsible container for the advanced fields users need not touch. */
+function AdvancedSection(props: {
+  title: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="dshTmAdvanced">
+      <DisclosureRow
+        title={props.title}
+        icon={<span className="dshTmAdvancedDot" aria-hidden="true" />}
+        open={open}
+        expandable
+        onToggle={() => setOpen((v) => !v)}
+      >
+        <div className="dshTmAdvancedBody dshTmSectionSeparator">{props.children}</div>
+      </DisclosureRow>
+    </div>
   )
 }
 
@@ -118,66 +147,70 @@ export function TmimCard(props: TmimCardProps) {
       >
       {v === undefined ? null : (
         <>
-          <Section title={key('sectionConnection')}>
+          <Section title={key('baseUrl')} compact>
             <TextRow id="tmim-baseUrl" label={key('baseUrl')} hint={key('baseUrlHint')}
               value={props.text('baseUrl')} disabled={disabled}
               onChange={(x) => props.editText('baseUrl', x)} />
-            <ReadOnlyRow id="tmim-deviceId" label={key('deviceId')}
-              value={props.text('deviceId')} hint={key('deviceIdHint')} />
           </Section>
 
-          <Section title={key('sectionCredential')}>
-            <p className="dshTmHint">{key('credentialHint')}</p>
+          <Section title={key('credToken')} compact>
             <TextRow id="tmim-credToken" label={key('credToken')} hint={key('credTokenHint')} secret
               value={props.text('credential.token')} disabled={disabled}
               onChange={(x) => props.editSecret('credential.token', x)} />
           </Section>
 
-          <Section title={key('sectionInbound')}>
-            <BoolRow id="tmim-wsEnabled" label={key('wsEnabled')} hint={key('wsEnabledHint')}
-              checked={v.ws.enabled} disabled={disabled}
-              onChange={(x) => props.editBool('ws.enabled', x)} />
-            <TextRow id="tmim-wsUrl" label={key('wsUrl')} hint={key('wsUrlHint')}
-              value={props.text('ws.url')} disabled={disabled}
-              onChange={(x) => props.editText('ws.url', x)} />
-            <NumberRow id="tmim-wsHeartbeat" label={key('wsHeartbeat')}
-              value={props.text('ws.heartbeatMs')} disabled={disabled}
-              onChange={(x) => props.editNumber('ws.heartbeatMs', x)} />
+          <AdvancedSection title={key('sectionAdvanced')}>
+            <Section title={key('deviceId')} compact>
+              <ReadOnlyRow id="tmim-deviceId" label={key('deviceId')}
+                value={props.text('deviceId')} hint={key('deviceIdHint')} />
+            </Section>
 
-            <BoolRow id="tmim-whEnabled" label={key('webhookEnabled')} hint={key('webhookEnabledHint')}
-              checked={v.webhook.enabled} disabled={disabled}
-              onChange={(x) => props.editBool('webhook.enabled', x)} />
-            <TextRow id="tmim-whPath" label={key('webhookPath')}
-              value={props.text('webhook.path')} disabled={disabled}
-              onChange={(x) => props.editText('webhook.path', x)} />
-            <TextRow id="tmim-whSecret" label={key('webhookSecret')} hint={key('webhookSecretHint')} secret
-              value={props.text('webhook.secret')} disabled={disabled}
-              onChange={(x) => props.editSecret('webhook.secret', x)} />
-            <NumberRow id="tmim-whSkew" label={key('webhookMaxSkew')}
-              value={props.text('webhook.maxSkewSeconds')} disabled={disabled}
-              onChange={(x) => props.editNumber('webhook.maxSkewSeconds', x)} />
-          </Section>
+            <Section title={key('sectionInbound')} compact>
+              <BoolRow id="tmim-wsEnabled" label={key('wsEnabled')} hint={key('wsEnabledHint')}
+                checked={v.ws.enabled} disabled={disabled}
+                onChange={(x) => props.editBool('ws.enabled', x)} />
+              <TextRow id="tmim-wsUrl" label={key('wsUrl')} hint={key('wsUrlHint')}
+                value={props.text('ws.url')} disabled={disabled}
+                onChange={(x) => props.editText('ws.url', x)} />
+              <NumberRow id="tmim-wsHeartbeat" label={key('wsHeartbeat')}
+                value={props.text('ws.heartbeatMs')} disabled={disabled}
+                onChange={(x) => props.editNumber('ws.heartbeatMs', x)} />
 
-          <Section title={key('sectionAgent')}>
-            <BoolRow id="tmim-takeover" label={key('enableAgentTakeover')}
-              hint={key('enableAgentTakeoverHint')} checked={v.enableAgentTakeover}
-              disabled={disabled} onChange={(x) => props.editBool('enableAgentTakeover', x)} />
-            <TextRow id="tmim-provider" label={key('agentProvider')}
-              value={props.text('agent.provider')} disabled={disabled}
-              onChange={(x) => props.editText('agent.provider', x)} />
-            <TextRow id="tmim-model" label={key('agentModel')} hint={key('agentModelHint')}
-              value={props.text('agent.model')} disabled={disabled}
-              onChange={(x) => props.editText('agent.model', x)} />
-            <TextRow id="tmim-preset" label={key('agentPreset')} hint={key('agentPresetHint')}
-              value={props.text('agentPreset')} disabled={disabled}
-              onChange={(x) => props.editText('agentPreset', x)} />
-            <TextRow id="tmim-cwd" label={key('cwd')} hint={key('cwdHint')}
-              value={props.text('cwd')} disabled={disabled}
-              onChange={(x) => props.editText('cwd', x)} />
-            <BoolRow id="tmim-tools" label={key('tools')} hint={key('toolsHint')}
-              checked={v.tools} disabled={disabled}
-              onChange={(x) => props.editBool('tools', x)} />
-          </Section>
+              <BoolRow id="tmim-whEnabled" label={key('webhookEnabled')} hint={key('webhookEnabledHint')}
+                checked={v.webhook.enabled} disabled={disabled}
+                onChange={(x) => props.editBool('webhook.enabled', x)} />
+              <TextRow id="tmim-whPath" label={key('webhookPath')}
+                value={props.text('webhook.path')} disabled={disabled}
+                onChange={(x) => props.editText('webhook.path', x)} />
+              <TextRow id="tmim-whSecret" label={key('webhookSecret')} hint={key('webhookSecretHint')} secret
+                value={props.text('webhook.secret')} disabled={disabled}
+                onChange={(x) => props.editSecret('webhook.secret', x)} />
+              <NumberRow id="tmim-whSkew" label={key('webhookMaxSkew')}
+                value={props.text('webhook.maxSkewSeconds')} disabled={disabled}
+                onChange={(x) => props.editNumber('webhook.maxSkewSeconds', x)} />
+            </Section>
+
+            <Section title={key('sectionAgent')} compact>
+              <BoolRow id="tmim-takeover" label={key('enableAgentTakeover')}
+                hint={key('enableAgentTakeoverHint')} checked={v.enableAgentTakeover}
+                disabled={disabled} onChange={(x) => props.editBool('enableAgentTakeover', x)} />
+              <TextRow id="tmim-provider" label={key('agentProvider')}
+                value={props.text('agent.provider')} disabled={disabled}
+                onChange={(x) => props.editText('agent.provider', x)} />
+              <TextRow id="tmim-model" label={key('agentModel')} hint={key('agentModelHint')}
+                value={props.text('agent.model')} disabled={disabled}
+                onChange={(x) => props.editText('agent.model', x)} />
+              <TextRow id="tmim-preset" label={key('agentPreset')} hint={key('agentPresetHint')}
+                value={props.text('agentPreset')} disabled={disabled}
+                onChange={(x) => props.editText('agentPreset', x)} />
+              <TextRow id="tmim-cwd" label={key('cwd')} hint={key('cwdHint')}
+                value={props.text('cwd')} disabled={disabled}
+                onChange={(x) => props.editText('cwd', x)} />
+              <BoolRow id="tmim-tools" label={key('tools')} hint={key('toolsHint')}
+                checked={v.tools} disabled={disabled}
+                onChange={(x) => props.editBool('tools', x)} />
+            </Section>
+          </AdvancedSection>
         </>
       )}
       </SettingsForm>
