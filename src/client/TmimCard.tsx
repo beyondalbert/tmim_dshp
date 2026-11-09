@@ -2,7 +2,6 @@ import {
   SettingsForm,
   Checkbox,
   Input,
-  SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   InjectFace, PropsLocale, PropsRuntime,
@@ -52,12 +51,26 @@ function NumberRow(props: {
   )
 }
 
+function ReadOnlyRow(props: {
+  id: string; label: string; hint?: string; value: string
+}) {
+  return (
+    <div className="dshTmRow">
+      <label className="dshTmLbl" htmlFor={props.id}>{props.label}</label>
+      <div className="dshTmCtl">
+        <div id={props.id} className="dshTmReadonly">{props.value || '—'}</div>
+        {props.hint ? <p className="dshTmHint">{props.hint}</p> : null}
+      </div>
+    </div>
+  )
+}
+
 function BoolRow(props: {
   id: string; label: string; hint?: string; checked: boolean; disabled: boolean
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="dshTmRow">
+    <div className="dshTmRow dshTmBool">
       <div className="dshTmCtl">
         <Checkbox checked={props.checked} label={props.label}
           disabled={props.disabled} onChange={props.onChange} />
@@ -88,7 +101,6 @@ export function TmimCard(props: TmimCardProps) {
 
   const v = view.value
   const disabled = !view.writable
-  const credKind = props.credKind()
 
   return (
     <div className="dshTmPage">
@@ -110,42 +122,15 @@ export function TmimCard(props: TmimCardProps) {
             <TextRow id="tmim-baseUrl" label={key('baseUrl')} hint={key('baseUrlHint')}
               value={props.text('baseUrl')} disabled={disabled}
               onChange={(x) => props.editText('baseUrl', x)} />
-            <TextRow id="tmim-deviceId" label={key('deviceId')} hint={key('deviceIdHint')}
-              value={props.text('deviceId')} disabled={disabled}
-              onChange={(x) => props.editText('deviceId', x)} />
+            <ReadOnlyRow id="tmim-deviceId" label={key('deviceId')}
+              value={props.text('deviceId')} hint={key('deviceIdHint')} />
           </Section>
 
           <Section title={key('sectionCredential')}>
             <p className="dshTmHint">{key('credentialHint')}</p>
-            <div className="dshTmRow">
-              <div className="dshTmCtl">
-                <SegmentedControl
-                  id="tmim-credKind"
-                  label={key('sectionCredential')}
-                  value={credKind}
-                  options={[
-                    { value: 'apikey', label: key('credKindApikey') },
-                    { value: 'password', label: key('credKindPassword') },
-                  ]}
-                  disabled={disabled}
-                  onChange={(k) => props.setCredentialKind(k as 'apikey' | 'password')}
-                />
-              </div>
-            </div>
-            {credKind === 'password' ? (
-              <>
-                <TextRow id="tmim-credUser" label={key('credUsername')}
-                  value={props.text('credential.username')} disabled={disabled}
-                  onChange={(x) => props.editText('credential.username', x)} />
-                <TextRow id="tmim-credPass" label={key('credPassword')} secret
-                  value={props.text('credential.password')} disabled={disabled}
-                  onChange={(x) => props.editSecret('credential.password', x)} />
-              </>
-            ) : (
-              <TextRow id="tmim-credToken" label={key('credToken')} hint={key('credTokenHint')} secret
-                value={props.text('credential.token')} disabled={disabled}
-                onChange={(x) => props.editSecret('credential.token', x)} />
-            )}
+            <TextRow id="tmim-credToken" label={key('credToken')} hint={key('credTokenHint')} secret
+              value={props.text('credential.token')} disabled={disabled}
+              onChange={(x) => props.editSecret('credential.token', x)} />
           </Section>
 
           <Section title={key('sectionInbound')}>

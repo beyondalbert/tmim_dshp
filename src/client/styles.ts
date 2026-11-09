@@ -40,6 +40,9 @@ const CSS = `
   gap: 8px 16px;
   margin-bottom: 14px;
 }
+.dshTmBool {
+  grid-template-columns: minmax(0, 1fr);
+}
 .dshTmRow > label.dshTmLbl {
   padding-top: 6px;
   font-size: 13px;
@@ -57,6 +60,14 @@ const CSS = `
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+.dshTmReadonly {
+  min-height: 32px;
+  padding: 5px 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary, #646a73);
+  overflow-wrap: anywhere;
 }
 .dshTmHint,
 .dshTmErr {
