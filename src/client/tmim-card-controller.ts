@@ -1,10 +1,5 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-
-/** Settings namespace the Host serves for this plugin row (`id: tmim`). */
-export const TMIM_NS = 'tmim'
 
 /** The resolved config the page reads and edits (booleans coerced). */
 export interface TmimConfig {
@@ -20,10 +15,7 @@ export interface TmimConfig {
   agent: { provider: string; model: string }
 }
 
-/**
- * One field's staged draft. A text/secret draft holds a raw string; a number
- * draft holds `{ text, valid }`; a boolean holds a direct value.
- */
+/** One field's staged draft. */
 type Draft =
   | { kind: 'text'; text: string }
   | { kind: 'secret'; text: string }
@@ -35,34 +27,66 @@ export function getPath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), obj)
 }
 
+/** TM IM management RPC endpoint (mirrors the Host-side settings-rpc.ts). */
+export const TMIM_RPC_CHANNEL = '/config'
+
+/** Host-provided Connection service (from @deepseek-ai/dsh-client-connection). */
+export interface TmimClientConnection {
+  rpc: {
+    call(endpointBase: string, endpoint: string, message: unknown, signal?: AbortSignal): Promise<unknown>
+  }
+}
+
 /**
- * The staged TM IM settings card. Subscribes to the shared `tmim` namespace
- * (writes land in `cordis.patch.yml` and hot-reload the plugin via Host
- * `configEditor`), keeps a local draft map, and writes all edits in one
- * revision-fenced mutate.
+ * The staged TM IM settings card. Instead of `configForms` (which only works when
+ * the Host serves a `tmim` settings namespace — absent for cordis.patch-installed
+ * plugins), it reads/writes config over the plugin's own Host management RPC fault.
+ * An initial `get` loads the running config; `save` sends the merged payload back.
  */
 export class TmimCardController {
-  private readonly form: ConfigForm<Record<string, unknown>>
   private readonly store: SnapshotStore<TmimCardView>
   private readonly drafts = new Map<string, Draft>()
   private saving = false
   private failed = false
   private validError: string | undefined
-  private readonly unsubscribe: () => void
+  private loaded = false
+  private readonly connection: TmimClientConnection | undefined
 
   constructor(private readonly ctx: ClientContext) {
-    this.form = ctx.configForms.get(TMIM_NS)
-    this.store = createSnapshotStore(this.project())
-    this.unsubscribe = this.form.subscribe(() => { this.store.set(this.project()) })
+    this.store = createSnapshotStore(this.project('loading'))
+    this.connection = (ctx as any).connection as TmimClientConnection | undefined
+    void this.load()
   }
 
-  private resolved(): Record<string, unknown> | undefined {
-    return this.form.getSnapshot().value as Record<string, unknown> | undefined
+  private async load(): Promise<void> {
+    if (!this.connection) {
+      this.store.set(this.project('unavailable'))
+      return
+    }
+    try {
+      const result = await callRpc(this.connection, 'get', null)
+      if (!result.ok) throw new Error(result.error?.message ?? 'RPC failed')
+      this.configure(result.value as Record<string, unknown> | undefined)
+    } catch {
+      this.store.set(this.project('unavailable'))
+    }
   }
+
+  /** Store the resolved config and re-project from it. */
+  private configure(raw: Record<string, unknown> | undefined): void {
+    this.raw = raw
+    this.loaded = true
+    this.store.set(this.project('ready'))
+    // Mark text fields dirty=null so the page renders the loaded values exactly once.
+  }
+
+  private raw: Record<string, unknown> | undefined
 
   private value(): TmimConfig | undefined {
-    const raw = this.resolved()
+    const raw = this.raw
     if (!raw) return undefined
+    const credential = raw.credential
+    const kind = (credential as any)?.kind === 'password' ? 'password' : 'apikey'
     return {
       baseUrl: str(raw.baseUrl),
       deviceId: str(raw.deviceId),
@@ -81,7 +105,14 @@ export class TmimCardController {
         secret: str((raw.webhook as any)?.secret),
         maxSkewSeconds: num((raw.webhook as any)?.maxSkewSeconds, 300),
       },
-      credential: raw.credential as TmimConfig['credential'],
+      credential:
+        kind === 'password'
+          ? {
+              kind: 'password',
+              username: str((credential as any)?.username),
+              password: str((credential as any)?.password),
+            }
+          : { kind: 'apikey', token: str((credential as any)?.token) },
       agent: {
         provider: str((raw.agent as any)?.provider),
         model: str((raw.agent as any)?.model),
@@ -93,19 +124,19 @@ export class TmimCardController {
     return [...this.drafts.values()].some(d => d.kind === 'number' && !d.valid)
   }
 
-  private project(): TmimCardView {
-    const snap = this.form.getSnapshot()
-    const available = snap.status === 'ready'
+  private project(status: 'loading' | 'ready' | 'unavailable' = this.loaded ? 'ready' : this.connection ? 'loading' : 'unavailable'): TmimCardView {
+    const val = this.value()
+    const available = status === 'ready'
     return {
-      status: snap.status,
-      value: this.value(),
-      writable: available && snap.writable,
+      status,
+      value: val,
+      writable: available,
       dirty: this.drafts.size > 0,
       saving: this.saving,
       failed: this.failed,
       invalid: this.invalid(),
       available,
-      revision: snap.revision,
+      revision: undefined,
     }
   }
 
@@ -160,31 +191,42 @@ export class TmimCardController {
     this.store.set(this.project())
   }
 
-  /** Atomic save of every staged edit, fenced by the revision the drafts started from. */
+  /** Build the merged config from the loaded value + staged drafts, then save via RPC. */
   async save(): Promise<void> {
-    if (this.saving || this.invalid()) return
+    if (this.saving || this.invalid() || !this.connection) return
     this.saving = true
     this.failed = false
     this.store.set(this.project())
-    const ops: Array<{ op: 'set'; path: string[]; value: unknown } | { op: 'unset'; path: string[] }> = []
+    const merged: Record<string, unknown> = JSON.parse(JSON.stringify(this.raw ?? {}))
     for (const [path, d] of this.drafts) {
       const parts = path.split('.')
+      let node: any = merged
+      for (let i = 0; i < parts.length - 1; i++) {
+        const key = parts[i] as string
+        if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
+        node = node[key]
+      }
+      const last = parts[parts.length - 1] as string
       if (d.kind === 'text' || d.kind === 'secret') {
         const trimmed = d.text.trim()
-        if (trimmed === '') ops.push({ op: 'unset', path: parts })
-        else ops.push({ op: 'set', path: parts, value: d.kind === 'text' ? trimmed : d.text })
+        if (trimmed === '') delete node[last]
+        else node[last] = d.kind === 'text' ? trimmed : d.text
       } else if (d.kind === 'number') {
         const trimmed = d.text.trim()
-        if (trimmed === '') ops.push({ op: 'unset', path: parts })
-        else ops.push({ op: 'set', path: parts, value: Number(trimmed) })
+        if (trimmed === '') delete node[last]
+        else node[last] = Number(trimmed)
       } else {
-        ops.push({ op: 'set', path: parts, value: d.value })
+        node[last] = d.value
       }
     }
     try {
-      const accepted = await this.form.mutate(ops, this.form.getSnapshot().revision)
-      if (accepted) this.drafts.clear()
-      else this.failed = true
+      const result = await callRpc(this.connection, 'set', merged)
+      if (result.ok) {
+        this.drafts.clear()
+        this.configure(result.value as Record<string, unknown> | undefined)
+      } else {
+        this.failed = true
+      }
     } catch {
       this.failed = true
     } finally {
@@ -208,8 +250,20 @@ export class TmimCardController {
     }
   }
 
-  /** Release the form subscription. */
-  dispose(): void { this.unsubscribe() }
+  dispose(): void {
+    /* no-op: RPC reads are fire-and-forget; nothing to unsubscribe. */
+  }
+}
+
+/** One `connection.rpc.call` against the TM IM management channel. */
+async function callRpc(
+  connection: TmimClientConnection,
+  method: string,
+  payload: unknown,
+): Promise<{ ok: true; value: unknown } | { ok: false; error?: { message?: string } }> {
+  const endpoint = `tmim${TMIM_RPC_CHANNEL}`
+  const response = await connection.rpc.call('/api', endpoint, { method, payload })
+  return response as any
 }
 
 /** What a read of the card produces. */

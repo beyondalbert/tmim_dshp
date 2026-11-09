@@ -10,7 +10,6 @@
  */
 
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -18,7 +17,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { TmimCard } from './TmimCard.tsx'
 import { TmimIcon } from './TmimIcon.tsx'
-import { TmimCardController, TMIM_NS } from './tmim-card-controller.ts'
+import { TmimCardController } from './tmim-card-controller.ts'
 import { en, zh, type TmimLocaleKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -31,17 +30,18 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'settings.tmim'
 
-/** Settings namespace the Host serves for this plugin. */
-export const ROW_ID = TMIM_NS
-
 /** Central panel id; shared by the sidebar entry and the main-slot occupant. */
 export const PANEL_ID = 'tmim' as MainPanelId
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'configForms']
+export const inject = ['slots', 'locale', 'connection']
 
 /**
- * Mount the TM IM settings page while the Host serves its namespace.
+ * Mount the TM IM settings page. The sidebar entry and its main panel appear as
+ * soon as this client bundle is served (like dsh-im), independent of whether the
+ * Host exposes a `tmim` settings namespace. The page reads/writes config over the
+ * plugin's own Host management RPC, so it works even when `configForms` has no
+ * served namespace.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
@@ -49,11 +49,6 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'tmim-client: dictionaries')
   const controller = new TmimCardController(ctx)
   ctx.effect(() => () => { controller.dispose() }, 'tmim-client: form subscription')
-  // Register unconditionally (like dsh-im): the sidebar entry and its main
-  // panel appear as soon as this client bundle is served, independent of
-  // whether the Host exposes a `tmim` settings namespace. When the namespace
-  // isn't composed the page renders read-only/unavailable; when it is, saves
-  // land in cordis.patch.yml and hot-reload the bridge.
   const stopPage = ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main', key: PANEL_ID, locale: NS,
     inject: () => controller.inject(),

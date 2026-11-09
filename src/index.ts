@@ -29,6 +29,9 @@ import { TmimBridge } from './bridge.ts'
 import { registerTmimTools } from './tools.ts'
 import { TmimWsClient, type InboundMessage } from './ws-client.ts'
 import { trace } from './trace.ts'
+import type { TmimConnection } from './settings-rpc.ts'
+import { mountTmimSettingsRpc } from './settings-rpc-handler.ts'
+import { persistConfigPatch } from './patch-persist.ts'
 
 // ---- Config ----
 
@@ -109,7 +112,7 @@ export const Config = (z.object({
 
 export const name = 'tmim'
 
-export const inject = ['tools', 'agents']
+export const inject = ['tools', 'agents', 'connection']
 
 apply.inject = inject
 
@@ -123,6 +126,47 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     ...(config.credential?.kind === 'apikey' && config.credential.token ? { token: config.credential.token } : {}),
     deviceId: config.deviceId,
   })
+
+  // Browser settings RPC (dsh-im architecture, not configForms/remote.settings):
+  // expose the running config so the DSH settings page can read and edit it even
+  // when the Host does not serve a `tmim` settings namespace. Connection-scoped
+  // fields (credential/baseUrl) are applied to the live client immediately;
+  // structural changes persist and take effect on restart.
+  let liveConfig: Config = config
+  const connection = (ctx as Context & { connection?: TmimConnection }).connection
+  const stopSettingsRpc =
+    typeof connection === 'object' && connection !== null
+      ? mountTmimSettingsRpc(connection, {
+          getConfig: () => liveConfig,
+          applyLive: (patch) => {
+            liveConfig = { ...liveConfig, ...patch }
+            // Apply connection-scoped changes to the running client so saves
+            // that only touch credential/baseUrl take effect without a restart.
+            const cred = patch.credential
+            if (cred?.kind === 'apikey') {
+              client.setToken(cred.token ?? '')
+            } else if (cred?.kind === 'password' && cred.username && cred.password) {
+              // Fire-and-forget login; failures surface on the next outbound use.
+              client.login(cred.username, cred.password).catch((err) => {
+                ctx.logger.error(`[tmim] live re-login failed: ${String(err)}`)
+              })
+            }
+          },
+          persist: (next) => persistConfigPatch({
+            baseUrl: next.baseUrl,
+            deviceId: next.deviceId,
+            enableAgentTakeover: next.enableAgentTakeover,
+            agentPreset: next.agentPreset,
+            cwd: next.cwd,
+            tools: next.tools,
+            ws: next.ws,
+            webhook: next.webhook,
+            agent: next.agent,
+            ...(next.credential ? { credential: next.credential } : {}),
+          } as unknown as Record<string, unknown>),
+        })
+      : () => {}
+  ctx.effect(() => stopSettingsRpc, 'tmim: settings RPC')
 
   // Optional credential: the plugin starts without one so it can be configured
   // later, but cannot authenticate until a token/credentials are supplied.
