@@ -185,6 +185,15 @@ export class TmimCardController {
     this.store.set(this.project())
   }
 
+  /** Currently selected credential kind: staged override if set, else committed. */
+  credKind(): 'apikey' | 'password' {
+    const draft = this.drafts.get('credential.kind')
+    if (draft && (draft.kind === 'text' || draft.kind === 'secret')) {
+      if (draft.text === 'password' || draft.text === 'apikey') return draft.text
+    }
+    return (this.value()?.credential?.kind as 'apikey' | 'password' | undefined) ?? 'apikey'
+  }
+
   /** Reset one field by clearing its override. */
   resetField(path: string): void {
     this.drafts.set(path, { kind: 'text', text: '' })
@@ -245,6 +254,7 @@ export class TmimCardController {
       editNumber: this.editNumber.bind(this),
       editBool: this.editBool.bind(this),
       setCredentialKind: this.setCredentialKind.bind(this),
+      credKind: this.credKind.bind(this),
       resetField: this.resetField.bind(this),
       save: () => { void this.save() },
     }
@@ -288,6 +298,7 @@ export interface TmimCardFace {
   editNumber: (path: string, text: string) => void
   editBool: (path: string, next: boolean) => void
   setCredentialKind: (kind: 'apikey' | 'password') => void
+  credKind: () => 'apikey' | 'password'
   resetField: (path: string) => void
   save: () => void
 }

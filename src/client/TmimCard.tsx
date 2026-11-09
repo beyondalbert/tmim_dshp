@@ -88,20 +88,22 @@ export function TmimCard(props: TmimCardProps) {
 
   const v = view.value
   const disabled = !view.writable
+  const credKind = props.credKind()
 
   return (
-    <SettingsForm
-      labels={{
-        unavailable: key('unavailable'),
-        readOnly: key('readOnly'),
-        save: key('save'),
-        saving: key('saving'),
-        saveFailed: key('saveFailed'),
-      }}
-      state={view}
-      onSave={props.save}
-      onDiscard={() => {}}
-    >
+    <div className="dshTmPage">
+      <SettingsForm
+        labels={{
+          unavailable: key('unavailable'),
+          readOnly: key('readOnly'),
+          save: key('save'),
+          saving: key('saving'),
+          saveFailed: key('saveFailed'),
+        }}
+        state={view}
+        onSave={props.save}
+        onDiscard={() => {}}
+      >
       {v === undefined ? null : (
         <>
           <Section title={key('sectionConnection')}>
@@ -120,7 +122,7 @@ export function TmimCard(props: TmimCardProps) {
                 <SegmentedControl
                   id="tmim-credKind"
                   label={key('sectionCredential')}
-                  value={v.credential?.kind ?? 'apikey'}
+                  value={credKind}
                   options={[
                     { value: 'apikey', label: key('credKindApikey') },
                     { value: 'password', label: key('credKindPassword') },
@@ -130,7 +132,7 @@ export function TmimCard(props: TmimCardProps) {
                 />
               </div>
             </div>
-            {v.credential?.kind === 'password' ? (
+            {credKind === 'password' ? (
               <>
                 <TextRow id="tmim-credUser" label={key('credUsername')}
                   value={props.text('credential.username')} disabled={disabled}
@@ -193,6 +195,7 @@ export function TmimCard(props: TmimCardProps) {
           </Section>
         </>
       )}
-    </SettingsForm>
+      </SettingsForm>
+    </div>
   )
 }

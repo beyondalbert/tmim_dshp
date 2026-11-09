@@ -19,6 +19,7 @@ import { TmimCard } from './TmimCard.tsx'
 import { TmimIcon } from './TmimIcon.tsx'
 import { TmimCardController } from './tmim-card-controller.ts'
 import { en, zh, type TmimLocaleKey } from './locales.ts'
+import { installTmimStyles } from './styles.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -47,6 +48,7 @@ export const inject = ['slots', 'locale', 'connection']
 export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'tmim-client: dictionaries')
+  ctx.effect(() => installTmimStyles(), 'tmim-client: styles')
   const controller = new TmimCardController(ctx)
   ctx.effect(() => () => { controller.dispose() }, 'tmim-client: form subscription')
   const stopPage = ctx.slots.inject('main', () => ctx.slots.register({
