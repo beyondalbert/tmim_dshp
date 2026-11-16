@@ -89,13 +89,15 @@ export async function persistConfigPatch(
     if (m && entryId === id) {
       // Found the tmim entry; keep the `- id` and `name` lines, replace config.
       out.push(line ?? '')
+      // Indent of this entry's children; top-level entries use 2 spaces.
+      const entryIndent = `${m[1] ?? ''}  `
       const nameMatch = /^(\s*)name:/.exec(lines[i + 1] ?? '')
       if (nameMatch) {
-        const ind = nameMatch[1] ?? '  '
+        const ind = nameMatch[1] ?? entryIndent
         i++
         out.push(`${ind}name: '@tmim/dsh-plugin-tmim'`)
       } else {
-        out.push(`  name: '@tmim/dsh-plugin-tmim'`)
+        out.push(`${entryIndent}name: '@tmim/dsh-plugin-tmim'`)
       }
       // Skip any remaining lines of the old entry (until next top-level `- `).
       while (i + 1 < lines.length) {
@@ -103,7 +105,7 @@ export async function persistConfigPatch(
         if (/^[^\s#]/.test(next ?? '')) break
         i++
       }
-      out.push(`  config:${emitValue(config, '')}`)
+      out.push(`${entryIndent}config:${emitValue(config, entryIndent)}`)
       replaced = true
       continue
     }
@@ -113,7 +115,7 @@ export async function persistConfigPatch(
   if (!replaced) {
     out.push(`- id: ${id}`)
     out.push(`  name: '@tmim/dsh-plugin-tmim'`)
-    out.push(`  config:${emitValue(config, '')}`)
+    out.push(`  config:${emitValue(config, '  ')}`)
   }
 
   // Atomic write: temp file + rename.
