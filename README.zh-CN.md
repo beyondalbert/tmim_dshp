@@ -24,7 +24,7 @@ Harness 接入 **TM IM** 网络。它把 TM IM 变成 Harness 智能体的消息
 - 一个正在运行的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 宿主
   （桌面版 / `web` profile）
 - 一个已开启 **Agent Takeover** 且带有 **api_key**（推荐）的 TM IM 账号
-- 你的 TM IM 基础地址（base URL），例如 `http://tmim.stkg.ltd/`
+- 你的 TM IM 基础地址（base URL），例如 `https://tmim.stkg.ltd/`
 
 ---
 
@@ -54,7 +54,7 @@ dsh plugin --profile desktop add "@tmim/dsh-plugin-tmim@0.1.16"
 - id: tmim
   name: '@tmim/dsh-plugin-tmim'
   config:
-    baseUrl: 'http://tmim.stkg.ltd/'     # 你的 TM IM 基础地址（末尾斜杠会自动归一化）
+    baseUrl: 'https://tmim.stkg.ltd/'     # 你的 TM IM 基础地址（末尾斜杠会自动归一化）
     credential:
       kind: apikey                       # 或: kind: 'password', username, password
       token: 'sk_live_xxxxxxxx'          # Agent Takeover api_key
@@ -84,7 +84,7 @@ dsh plugin --profile desktop add "@tmim/dsh-plugin-tmim@0.1.16"
 
 | 现象 | 检查 |
 |---|---|
-| 收不到消息 / 无回复 | 确认 `baseUrl` 为 `http://tmim.stkg.ltd/`（不要带 `/v1`；末尾斜杠会自动处理）；确认 WS 已启用（`ws.enabled: true`） |
+| 收不到消息 / 无回复 | 确认 `baseUrl` 为 `https://tmim.stkg.ltd/`（不要带 `/v1`；末尾斜杠会自动处理）；确认 WS 已启用（`ws.enabled: true`） |
 | 回复能发出但“没有执行工具” | 确认 `agentPreset` 留空（挂载宿主默认 preset），且 trace 中 `[composeSetup]` 没有 FAILED |
 | 改了配置不生效 | 每次 `dsh plugin ... add` 或改配置后都需**重启 Electron 应用** |
 
@@ -104,7 +104,7 @@ pnpm install && pnpm build
 ```yaml
 - name: '@tmim/dsh-plugin-tmim'
   config:
-    baseUrl: 'http://tmim.example.com'
+    baseUrl: 'https://tmim.example.com'
     credential:
       kind: 'apikey'          # 或: kind: 'password', username, password
       token: 'tm_xxxxxxxx'

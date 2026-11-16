@@ -74,7 +74,7 @@ export type Config = {
 }
 
 export const Config = (z.object({
-  baseUrl: z.string().default('http://tmim.stkg.ltd/').description(
+  baseUrl: z.string().default('https://tmim.stkg.ltd/').description(
     'TM IM 服务器地址（不带 /v1 后缀）。例如：https://tmim.example.com',
   ),
   credential: z.union([

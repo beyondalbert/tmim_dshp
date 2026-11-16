@@ -38,7 +38,7 @@ export interface InboundMessage {
 }
 
 export interface TmimWsOptions {
-  /** WebSocket URL, e.g. `ws://tmim.stkg.ltd/ws`. */
+  /** WebSocket URL, e.g. `wss://tmim.stkg.ltd/ws`. */
   url: string
   /** Agent takeover api_key (AUTH token). */
   token: string
